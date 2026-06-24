@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unit Mix Summary Tool</title>
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3348;
+      --accent:    #4a7ff7;
+      --accent-h:  #3a6de0;
+      --text:      #e8eaf0;
+      --text-muted:#8b91a8;
+      --success:   #2dce89;
+      --danger:    #f75a5a;
+      --warn:      #f7a84a;
+      --radius:    12px;
+      --chat-max:  820px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .header-logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), #7c5af7);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+    .header-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .header-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    /* ── Chat area ─────────────────────────────────────────────────────── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .message-row {
+      display: flex;
+      gap: 10px;
+      max-width: var(--chat-max);
+      margin: 0 auto;
+      width: 100%;
+    }
+    .message-row.user { justify-content: flex-end; }
+
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0; margin-top: 2px;
+    }
+    .avatar.bot  { background: linear-gradient(135deg, var(--accent), #7c5af7); color:#fff; font-weight:700; }
+    .avatar.user { background: var(--surface2); }
+
+    .bubble {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      max-width: 80%;
+    }
+    .message-row.user .bubble {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Upload zone ───────────────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--surface2);
+      margin-top: 8px;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(74, 127, 247, 0.06);
+    }
+    .upload-icon { font-size: 36px; margin-bottom: 10px; }
+    .upload-label { font-size: 14px; color: var(--text-muted); }
+    .upload-label strong { color: var(--accent); }
+    .upload-hint  { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    #file-input { display: none; }
+
+    /* ── Typing indicator ──────────────────────────────────────────────── */
+    .typing { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text-muted);
+      animation: bounce 1.2s infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+      40%            { transform: translateY(-6px); opacity: 1; }
+    }
+
+    /* ── Unit mix table ────────────────────────────────────────────────── */
+    .result-wrapper { width: 100%; overflow-x: auto; }
+
+    .unit-mix-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .unit-mix-title { font-size: 16px; font-weight: 700; color: var(--text); }
+    .unit-mix-meta  { font-size: 12px; color: var(--text-muted); }
+
+    .unit-mix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 680px;
+    }
+    .unit-mix-table th {
+      background: #1f2d4e;
+      color: #fff;
+      font-weight: 600;
+      padding: 9px 12px;
+      text-align: center;
+      white-space: nowrap;
+      border: 1px solid #2e4272;
+      font-size: 12px;
+    }
+    .unit-mix-table td {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .unit-mix-table td:first-child { text-align: center; font-weight: 600; }
+    .unit-mix-table tbody tr:nth-child(even) td { background: rgba(74,127,247,0.05); }
+    .unit-mix-table tbody tr:hover td { background: rgba(74,127,247,0.10); }
+
+    .unit-mix-table .row-totals td {
+      background: var(--surface2);
+      font-weight: 700;
+      border-top: 2px solid var(--accent);
+    }
+    .unit-mix-table .row-monthly td,
+    .unit-mix-table .row-annual  td {
+      background: #1f2d4e;
+      color: #fff;
+      font-weight: 600;
+      border-color: #2e4272;
+    }
+    .unit-mix-table .row-monthly td:first-child,
+    .unit-mix-table .row-annual  td:first-child { text-align: right; }
+
+    .neg { color: #f75a5a; }
+    .pos { color: #2dce89; }
+
+    /* ── Occupancy bar ─────────────────────────────────────────────────── */
+    .occ-bar-wrap {
+      margin: 16px 0 4px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .occ-bar-label { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; }
+    .occ-bar-track {
+      height: 8px; background: var(--border); border-radius: 99px; overflow: hidden;
+    }
+    .occ-bar-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      transition: width 0.6s ease;
+    }
+
+    /* ── Download button ───────────────────────────────────────────────── */
+    .btn-download {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 16px;
+      padding: 9px 18px;
+      background: var(--accent);
+      color: #fff;
+      border: none; border-radius: 8px;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-download:hover  { background: var(--accent-h); }
+    .btn-download:active { transform: scale(0.97); }
+
+    /* ── Input bar ─────────────────────────────────────────────────────── */
+    .input-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .input-bar-inner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: var(--chat-max);
+      margin: 0 auto;
+      width: 100%;
+    }
+    .attach-btn {
+      width: 38px; height: 38px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text-muted); cursor: pointer; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, color 0.2s;
+      flex-shrink: 0;
+    }
+    .attach-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .text-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .text-input::placeholder { color: var(--text-muted); }
+    .text-input:focus { border-color: var(--accent); }
+
+    .send-btn {
+      width: 38px; height: 38px; border-radius: 8px;
+      border: none; background: var(--accent);
+      color: #fff; cursor: pointer; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .send-btn:hover  { background: var(--accent-h); }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn:disabled { background: var(--surface2); color: var(--text-muted); cursor: not-allowed; }
+
+    /* ── Scrollbar ─────────────────────────────────────────────────────── */
+    .chat-area::-webkit-scrollbar { width: 5px; }
+    .chat-area::-webkit-scrollbar-track { background: transparent; }
+    .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo">UM</div>
+    <span class="header-title">Unit Mix Summary Tool</span>
+    <span class="header-sub">Automated Rent Roll Analysis</span>
+  </header>
+
+  <!-- Chat -->
+  <main class="chat-area" id="chat-area">
+
+    <!-- Hidden file input for upload zone (kept for drag & drop support) -->
+    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" />
+
+  </main>
+
+  <!-- Input bar -->
+  <div class="input-bar">
+    <div class="input-bar-inner">
+      <button class="attach-btn" id="attach-btn" title="Attach rent roll file">📎</button>
+      <input class="text-input" id="text-input"
+             placeholder="Upload a rent roll file above, or type a question…"
+             autocomplete="off" />
+      <button class="send-btn" id="send-btn" title="Send">➤</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="bottom-file-input" accept=".xlsx,.xls" style="display:none" />
+
+<script>
+/* ── Helpers ──────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const chat = $('chat-area');
+
+function fmt(n, style='currency') {
+  if (style === 'currency') return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2}).format(n);
+  if (style === 'pct')      return (n * 100).toFixed(2) + '%';
+  if (style === 'int')      return new Intl.NumberFormat('en-US').format(n);
+  return n;
+}
+
+function colorClass(n) {
+  if (n < 0) return 'neg';
+  if (n > 0) return 'pos';
+  return '';
+}
+
+function scrollBottom() {
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addMessage(html, role='bot') {
+  const row = document.createElement('div');
+  row.className = `message-row${role==='user'?' user':''}`;
+
+  const avatar = document.createElement('div');
+  avatar.className = `avatar ${role}`;
+  avatar.textContent = role === 'bot' ? 'UM' : '👤';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = html;
+
+  if (role === 'user') {
+    row.appendChild(bubble);
+    row.appendChild(avatar);
+  } else {
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+  }
+
+  chat.appendChild(row);
+  scrollBottom();
+  return bubble;
+}
+
+function addTyping() {
+  const row = document.createElement('div');
+  row.className = 'message-row';
+  row.id = 'typing-row';
+  row.innerHTML = `
+    <div class="avatar bot">UM</div>
+    <div class="bubble">
+      <div class="typing">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+    </div>`;
+  chat.appendChild(row);
+  scrollBottom();
+}
+
+function removeTyping() {
+  const el = $('typing-row');
+  if (el) el.remove();
+}
+
+/* ── Build result bubble ─────────────────────────────────────────── */
+function buildResultHTML(data) {
+  const { property_name, as_of, rows, totals, monthly, annual, excel_b64, filename } = data;
+
+  const occPct = totals.total_units ? (totals.total_occupied / totals.total_units) : 0;
+
+  let tableRows = '';
+  for (const r of rows) {
+    tableRows += `
+      <tr>
+        <td>${fmt(r.sqft,'int')} SF</td>
+        <td style="text-align:center">${r.num_units}</td>
+        <td style="text-align:center">${r.num_occupied}</td>
+        <td style="text-align:center">${r.num_vacant}</td>
+        <td style="text-align:center">${fmt(r.pct,'pct')}</td>
+        <td>${fmt(r.gpr)}</td>
+        <td class="${colorClass(r.loss_to_lease)}">${fmt(r.loss_to_lease)}</td>
+        <td>${fmt(r.in_place_rent)}</td>
+        <td class="${colorClass(r.vacancy)}">${fmt(r.vacancy)}</td>
+        <td>${fmt(r.net_rental_income)}</td>
+      </tr>`;
+  }
+
+  const dl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${excel_b64}`;
+
+  return `
+    <div class="result-wrapper">
+      <div class="unit-mix-header">
+        <div>
+          <div class="unit-mix-title">Unit Mix${property_name ? ' — ' + property_name : ''}</div>
+          ${as_of ? `<div class="unit-mix-meta">As Of ${as_of}</div>` : ''}
+        </div>
+        <div class="unit-mix-meta">${totals.total_units} Units Total</div>
+      </div>
+
+      <!-- Occupancy bar -->
+      <div class="occ-bar-wrap">
+        <div class="occ-bar-label">
+          <span>Physical Occupancy</span>
+          <span>${fmt(occPct,'pct')} &nbsp;(${totals.total_occupied} occupied / ${totals.total_vacant} vacant)</span>
+        </div>
+        <div class="occ-bar-track">
+          <div class="occ-bar-fill" style="width:${(occPct*100).toFixed(1)}%"></div>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto; margin-top:12px">
+        <table class="unit-mix-table">
+          <thead>
+            <tr>
+              <th>Unit Type (SF)</th>
+              <th># of Units</th>
+              <th># of Occupied</th>
+              <th># of Vacant</th>
+              <th>%</th>
+              <th>GPR</th>
+              <th>Loss to Lease</th>
+              <th>In Place Rent</th>
+              <th>Vacancy</th>
+              <th>Net Rental Income</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            <tr class="row-totals">
+              <td>Totals</td>
+              <td style="text-align:center">${totals.total_units}</td>
+              <td style="text-align:center">${totals.total_occupied}</td>
+              <td style="text-align:center">${totals.total_vacant}</td>
+              <td colspan="6"></td>
+            </tr>
+            <tr class="row-monthly">
+              <td colspan="4"></td>
+              <td>Monthly</td>
+              <td>${fmt(monthly.gpr)}</td>
+              <td class="${colorClass(monthly.loss)}">${fmt(monthly.loss)}</td>
+              <td>${fmt(monthly.in_place)}</td>
+              <td class="${colorClass(monthly.vacancy)}">${fmt(monthly.vacancy)}</td>
+              <td>${fmt(monthly.net)}</td>
+            </tr>
+            <tr class="row-annual">
+              <td colspan="4"></td>
+              <td>Annually</td>
+              <td>${fmt(annual.gpr)}</td>
+              <td class="${colorClass(annual.loss)}">${fmt(annual.loss)}</td>
+              <td>${fmt(annual.in_place)}</td>
+              <td class="${colorClass(annual.vacancy)}">${fmt(annual.vacancy)}</td>
+              <td>${fmt(annual.net)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <a class="btn-download" href="${dl}" download="${filename}">
+        ⬇ Download Excel
+      </a>
+    </div>`;
+}
+
+/* ── File upload flow ────────────────────────────────────────────── */
+async function handleFile(file) {
+  if (!file) return;
+  if (!file.name.match(/\.(xlsx|xls)$/i)) {
+    addMessage('⚠️ Please upload an Excel file (.xlsx or .xls).', 'bot');
+    return;
+  }
+
+  // User bubble showing the file name
+  addMessage(`📎 <strong>${file.name}</strong>`, 'user');
+  addTyping();
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/api/analyze', { method: 'POST', body: formData });
+    const data = await res.json();
+    removeTyping();
+
+    if (!res.ok) {
+      addMessage(`⚠️ ${data.detail || 'Something went wrong parsing the file.'}`, 'bot');
+      return;
+    }
+
+    const bubble = addMessage('', 'bot');
+    bubble.innerHTML = buildResultHTML(data);
+    scrollBottom();
+
+  } catch (err) {
+    removeTyping();
+    addMessage('⚠️ Network error — make sure the server is running.', 'bot');
+    console.error(err);
+  }
+}
+
+/* ── Wire up file inputs ─────────────────────────────────────────── */
+const fileInput   = $('file-input');
+const attachBtn   = $('attach-btn');
+const bottomInput = $('bottom-file-input');
+
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value=''; });
+
+// Drag & drop on the whole chat area
+chat.addEventListener('dragover', e => { e.preventDefault(); });
+chat.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+// Attach button in input bar
+attachBtn.addEventListener('click', () => bottomInput.click());
+bottomInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value=''; });
+
+/* ── Text input (basic Q&A / re-upload prompt) ───────────────────── */
+const textInput = $('text-input');
+const sendBtn   = $('send-btn');
+
+function handleText() {
+  const msg = textInput.value.trim();
+  if (!msg) return;
+  textInput.value = '';
+  addMessage(msg, 'user');
+
+  // Simple guidance responses
+  const lc = msg.toLowerCase();
+  if (lc.includes('upload') || lc.includes('file') || lc.includes('rent roll')) {
+    addMessage('Click the 📎 button or drag &amp; drop your rent roll Excel file into the chat to get started.', 'bot');
+  } else if (lc.includes('how') || lc.includes('what')) {
+    addMessage(`
+      This tool reads your rent roll Excel file and computes:<br><br>
+      <strong>For each unit type (grouped by sq ft):</strong><br>
+      • Unit count, Occupied &amp; Vacant counts<br>
+      • GPR (Gross Potential Rent) — avg market rent<br>
+      • Loss to Lease — difference between market and in-place<br>
+      • In Place Rent — avg actual rent (occupied units)<br>
+      • Vacancy — rent lost from empty units<br>
+      • Net Rental Income<br><br>
+      Monthly and Annual totals are included. Results can be downloaded as Excel.
+    `, 'bot');
+  } else {
+    addMessage('To generate a unit mix summary, upload your rent roll Excel file using the 📎 button.', 'bot');
+  }
+}
+
+sendBtn.addEventListener('click', handleText);
+textInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleText(); }});
+</script>
+</body>
+</html>
