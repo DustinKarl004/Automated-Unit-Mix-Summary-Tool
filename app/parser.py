@@ -1,19 +1,3 @@
-"""
-Rent roll Excel parser.
-
-Expects a standard rent roll export with this column layout (data rows start after headers):
-  Col A: Unit number
-  Col B: Unit Type
-  Col C: Sq Ft  (unit type key)
-  Col D: Resident ID
-  Col E: Name   (contains "VACANT" or "DOWN" for non-revenue / vacant units)
-  Col F: Market Rent
-  Col G: Actual Rent
-
-Handles variable header rows by scanning for the first row whose column A looks like
-a unit number (numeric string or integer).
-"""
-
 from __future__ import annotations
 
 import re
@@ -42,7 +26,6 @@ class RentRoll:
 
 
 def _is_unit_row(row_values: tuple) -> bool:
-    """Return True if this row looks like a unit data row (col A = unit number)."""
     val = row_values[0]
     if val is None:
         return False
@@ -72,17 +55,14 @@ def parse_rent_roll(file_bytes: bytes) -> RentRoll:
 
     all_rows = list(ws.iter_rows(values_only=True))
 
-    # Extract property name and as-of date from early header rows
     property_name = ""
     as_of = ""
     for row in all_rows[:10]:
         val = _safe_str(row[0]) if row[0] is not None else ""
         if val and not property_name and val.lower() not in ("rent roll", ""):
-            # Second non-empty line is usually the property name
             if property_name == "" and val.lower() != "rent roll":
                 property_name = val
         if val.lower().startswith("as of"):
-            as_of = val.replace("As Of =", "").replace("as of =", "").strip()
             as_of = val.split("=")[-1].strip() if "=" in val else val
 
     units: list[RentRollUnit] = []
@@ -90,7 +70,6 @@ def parse_rent_roll(file_bytes: bytes) -> RentRoll:
         if not _is_unit_row(row):
             continue
 
-        # Defensive: ensure we have at least 7 columns
         padded = list(row) + [None] * 13
         unit_num = _safe_str(padded[0])
         unit_type = _safe_str(padded[1])

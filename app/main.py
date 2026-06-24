@@ -1,5 +1,3 @@
-"""FastAPI application — serves the chat UI and processes rent roll uploads."""
-
 from __future__ import annotations
 
 import base64
@@ -7,10 +5,10 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.analyzer import UnitMixSummary, analyze
+from app.analyzer import analyze
 from app.exporter import export_unit_mix
 from app.parser import parse_rent_roll
 
@@ -48,7 +46,6 @@ async def analyze_rent_roll(file: UploadFile = File(...)):
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    # Serialize for JSON
     rows = [
         {
             "sqft": r.sqft,
@@ -65,7 +62,6 @@ async def analyze_rent_roll(file: UploadFile = File(...)):
         for r in summary.rows
     ]
 
-    # Generate Excel and embed as base64 so the frontend can offer a download
     excel_bytes = export_unit_mix(summary)
     excel_b64 = base64.b64encode(excel_bytes).decode()
 
